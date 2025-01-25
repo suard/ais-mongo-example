@@ -55,19 +55,19 @@ async fn main() -> Result<(), anyhow::Error> {
 fn process_message(json: Value) -> Option<PositionReport> {
     let message_type = json.get("MessageType");
 
-    match message_type {
+    return match message_type {
         None => {
-            return None;
+            None
         }
         Some(value) => match value.as_str() {
             Some("PositionReport") => {
                 let position_report: PositionReport =
                     serde_json::from_str(&json.to_string()).unwrap();
 
-                return Some(position_report);
+                Some(position_report)
             }
             _ => {
-                return None;
+                None
             }
         },
     }
