@@ -1,0 +1,17 @@
+[package]
+name = "ais-map"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.95"
+futures-util = { version = "0.3.28", default-features = false, features = ["sink", "std"] }
+serde = { version = "1.0.217", features = ["derive"] }
+serde_json = "1.0.135"
+tokio = { version = "1.43.0", features = ["full"] }
+tokio-tungstenite = { version = "0.26.1", features = ["native-tls"] }
+chrono = "0.4.39"
+mongodb = "3.2.0"
+dotenvy = "0.15.7"
+serde-env = "0.2.0"
+
