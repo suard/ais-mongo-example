@@ -1,0 +1,1 @@
+Opens a websocket to https://aisstream.io/ and listens for AIS messages and stores the PositionReport Message into a mongodb
