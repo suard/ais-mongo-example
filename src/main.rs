@@ -4,6 +4,7 @@ mod messages;
 use crate::config::AisMapConfig;
 use crate::messages::position_report::PositionReport;
 use futures_util::{SinkExt, StreamExt};
+use log::info;
 use mongodb::options::ClientOptions;
 use serde_env::from_env;
 use serde_json::{json, Value};
@@ -13,19 +14,25 @@ use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
     dotenvy::dotenv()?;
+    env_logger::init();
+    
+    info!("Starting AIS Map Service");
 
     let configuration: AisMapConfig = from_env()?;
 
-    let url = "wss://stream.aisstream.io/v0/stream";
+    
     let client =
         mongodb::Client::with_options(ClientOptions::parse(configuration.mongodb_url).await?)?;
-
+    
+    let url = "wss://stream.aisstream.io/v0/stream";
     let request = url.into_client_request()?;
     let (mut stream, _) = connect_async(request).await.unwrap();
 
     stream
         .send(create_subscription_message(&configuration.aisstream_apikey).into())
         .await?;
+
+    info!("Initialized aisstream websocket client");
 
     while let Some(msg) = stream.next().await {
         let msg = msg?;
@@ -37,13 +44,13 @@ async fn main() -> Result<(), anyhow::Error> {
             match position_report {
                 None => {}
                 Some(position_report) => {
-                    dbg!(&position_report);
-
                     let _ = client
                         .database("ais_map")
                         .collection::<PositionReport>("position_reports")
                         .insert_one(position_report)
                         .await;
+
+                    info!("Received position report message and stored it in the database (mongodb)");
                 }
             }
         }
