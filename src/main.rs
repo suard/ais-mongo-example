@@ -10,27 +10,49 @@ use serde_env::from_env;
 use serde_json::{json, Value};
 use tokio_tungstenite::connect_async;
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;
+use tokio_tungstenite::tungstenite::Error;
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
     dotenvy::dotenv()?;
     env_logger::init();
-    
+
     info!("Starting AIS Map Service");
 
     let configuration: AisMapConfig = from_env()?;
 
-    
     let client =
         mongodb::Client::with_options(ClientOptions::parse(configuration.mongodb_url).await?)?;
-    
+
     let url = "wss://stream.aisstream.io/v0/stream";
     let request = url.into_client_request()?;
-    let (mut stream, _) = connect_async(request).await.unwrap();
 
-    stream
-        .send(create_subscription_message(&configuration.aisstream_apikey).into())
-        .await?;
+    let mut stream;
+
+    match connect_async(request).await {
+        Ok((ws_stream, _)) => {
+            println!("Connected successfully!");
+            stream = ws_stream; // Assign it here
+        }
+        Err(Error::Http(response)) => {
+            if let Some(body) = response.body() {
+                let body_str = String::from_utf8_lossy(body);
+                eprintln!(
+                    "Connection failed: HTTP {} - {}",
+                    response.status(),
+                    body_str
+                );
+            } else {
+                eprintln!("Connection failed: HTTP {}", response.status());
+            }
+
+            return Err(Error::Http(response).into());
+        }
+        Err(err) => {
+            eprintln!("Connection failed: {:?}", err);
+            return Err(err.into());
+        }
+    }
 
     info!("Initialized aisstream websocket client");
 
@@ -50,7 +72,9 @@ async fn main() -> Result<(), anyhow::Error> {
                         .insert_one(position_report)
                         .await;
 
-                    info!("Received position report message and stored it in the database (mongodb)");
+                    info!(
+                        "Received position report message and stored it in the database (mongodb)"
+                    );
                 }
             }
         }
@@ -63,9 +87,7 @@ fn process_message(json: Value) -> Option<PositionReport> {
     let message_type = json.get("MessageType");
 
     return match message_type {
-        None => {
-            None
-        }
+        None => None,
         Some(value) => match value.as_str() {
             Some("PositionReport") => {
                 let position_report: PositionReport =
@@ -73,11 +95,9 @@ fn process_message(json: Value) -> Option<PositionReport> {
 
                 Some(position_report)
             }
-            _ => {
-                None
-            }
+            _ => None,
         },
-    }
+    };
 }
 
 fn create_subscription_message(api_key: &str) -> String {
