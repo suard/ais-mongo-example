@@ -4,7 +4,7 @@ mod messages;
 use crate::config::AisMapConfig;
 use crate::messages::position_report::PositionReport;
 use futures_util::{SinkExt, StreamExt};
-use log::info;
+use log::{debug, info};
 use mongodb::options::ClientOptions;
 use serde_env::from_env;
 use serde_json::{json, Value};
@@ -54,14 +54,17 @@ async fn main() -> Result<(), anyhow::Error> {
         }
     }
 
+    stream
+        .send(create_subscription_message(&configuration.aisstream_apikey).into())
+        .await?;
+
     info!("Initialized aisstream websocket client");
 
     while let Some(msg) = stream.next().await {
         let msg = msg?;
-
         if msg.is_binary() {
             let json: Value = serde_json::from_str(&msg.to_string())?;
-
+        
             let position_report = process_message(json);
             match position_report {
                 None => {}
@@ -71,7 +74,7 @@ async fn main() -> Result<(), anyhow::Error> {
                         .collection::<PositionReport>("position_reports")
                         .insert_one(position_report)
                         .await;
-
+        
                     info!(
                         "Received position report message and stored it in the database (mongodb)"
                     );
