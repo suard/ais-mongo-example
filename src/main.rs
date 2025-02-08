@@ -89,7 +89,7 @@ async fn main() -> Result<(), anyhow::Error> {
 fn process_message(json: Value) -> Option<PositionReport> {
     let message_type = json.get("MessageType");
 
-    return match message_type {
+    match message_type {
         None => None,
         Some(value) => match value.as_str() {
             Some("PositionReport") => {
@@ -100,7 +100,7 @@ fn process_message(json: Value) -> Option<PositionReport> {
             }
             _ => None,
         },
-    };
+    }
 }
 
 fn create_subscription_message(api_key: &str) -> String {
