@@ -17,6 +17,8 @@ async fn main() -> Result<(), anyhow::Error> {
     dotenvy::dotenv()?;
     env_logger::init();
 
+    println!("test :D");
+
     info!("Starting AIS Map Service");
 
     let configuration: AisMapConfig = from_env()?;
