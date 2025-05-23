@@ -4,7 +4,7 @@ mod messages;
 use crate::config::AisMapConfig;
 use crate::messages::position_report::PositionReport;
 use futures_util::{SinkExt, StreamExt};
-use log::{debug, info};
+use log::{debug, info, error};
 use mongodb::options::ClientOptions;
 use serde_env::from_env;
 use serde_json::{json, Value};
@@ -64,24 +64,26 @@ async fn main() -> Result<(), anyhow::Error> {
         let msg = msg?;
         if msg.is_binary() {
             let json: Value = serde_json::from_str(&msg.to_string())?;
-        
-            let position_report = process_message(json);
-            match position_report {
-                None => {}
-                Some(position_report) => {
 
-                    debug!("{:?}", position_report);
-
-                    let _ = client
-                        .database("ais_map")
-                        .collection::<PositionReport>("position_reports")
-                        .insert_one(position_report)
-                        .await;
-        
-                    info!(
-                        "Received position report message and stored it in the database (mongodb)"
-                    );
+            let position_report = match PositionReport::try_from(json) {
+                Ok(report) => report,
+                Err(e) => {
+                    debug!("Invalid position report: {}", e);
+                    continue;
                 }
+            };
+
+            debug!("{:?}", position_report);
+
+            if let Err(e) = client
+                .database("ais_map")
+                .collection::<PositionReport>("position_reports")
+                .insert_one(position_report)
+                .await
+            {
+                error!("Failed to insert into database: {}", e);
+            } else {
+                info!("Received position report message and stored it in the database (mongodb)");
             }
         }
     }
@@ -89,27 +91,10 @@ async fn main() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-fn process_message(json: Value) -> Option<PositionReport> {
-    let message_type = json.get("MessageType");
-
-    match message_type {
-        None => None,
-        Some(value) => match value.as_str() {
-            Some("PositionReport") => {
-                let position_report: PositionReport =
-                    serde_json::from_str(&json.to_string()).unwrap();
-
-                Some(position_report)
-            }
-            _ => None,
-        },
-    }
-}
-
 fn create_subscription_message(api_key: &str) -> String {
-    return json!({
+    json!({
         "APIKey": api_key,
         "BoundingBoxes": [[[51.937240, 4.215410], [51.900218, 4.272807]]]
     })
-    .to_string();
+    .to_string()
 }

@@ -1,4 +1,7 @@
+use std::{error::Error, fmt};
+
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 /**
  * @todo make message_type enum
@@ -60,4 +63,49 @@ struct PositionReportMessage {
     user_id: u32,
     #[serde(rename = "Valid")]
     valid: bool,
+}
+
+impl TryFrom<Value> for PositionReport {
+    type Error = PositionReportError;
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        let message_type = value
+            .get("MessageType")
+            .ok_or(PositionReportError::MissingMessageType)?;
+
+        match message_type.as_str() {
+            Some("PositionReport") => {
+                serde_json::from_value(value).map_err(PositionReportError::DeserializationError)
+            }
+            _ => Err(PositionReportError::InvalidMessageType),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum PositionReportError {
+    MissingMessageType,
+    InvalidMessageType,
+    DeserializationError(serde_json::Error),
+}
+
+impl Error for PositionReportError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            PositionReportError::DeserializationError(err) => Some(err),
+            _ => None,
+        }
+    }
+}
+
+impl fmt::Display for PositionReportError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            PositionReportError::MissingMessageType => write!(f, "MessageType is missing"),
+            PositionReportError::InvalidMessageType => write!(f, "Invalid MessageType"),
+            PositionReportError::DeserializationError(err) => {
+                write!(f, "Deserialization error: {}", err)
+            }
+        }
+    }
 }
