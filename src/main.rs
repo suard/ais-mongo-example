@@ -24,15 +24,14 @@ async fn main() -> Result<(), anyhow::Error> {
     let client =
         mongodb::Client::with_options(ClientOptions::parse(configuration.mongodb_url).await?)?;
 
-    let url = "wss://stream.aisstream.io/v0/stream";
-    let request = url.into_client_request()?;
+    let request = configuration.aisstream_url.into_client_request()?;
 
     let mut stream;
 
     match connect_async(request).await {
         Ok((ws_stream, _)) => {
             println!("Connected successfully!");
-            stream = ws_stream; // Assign it here
+            stream = ws_stream;
         }
         Err(Error::Http(response)) => {
             if let Some(body) = response.body() {
