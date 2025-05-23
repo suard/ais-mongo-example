@@ -69,6 +69,9 @@ async fn main() -> Result<(), anyhow::Error> {
             match position_report {
                 None => {}
                 Some(position_report) => {
+
+                    debug!("{:?}", position_report);
+
                     let _ = client
                         .database("ais_map")
                         .collection::<PositionReport>("position_reports")
